@@ -15,12 +15,26 @@ class Decoder(srd.Decoder):
         {'id': 'scl', 'name': 'SCL', 'desc': 'Clock'},
         {'id': 'sdo', 'name': 'SDO', 'desc': 'Data'},
     )
+    annotations = (
+        ('dv', 'Data valid'),
+    )
+    annotation_rows = (
+        ('fields', 'Fields', (0,)),
+    )
+
+    def __init__(self):
+        self.out_ann = None
+        self.dv_block_ss = None
 
     def start(self):
-        pass
+        self.out_ann = self.register(srd.OUTPUT_ANN)
 
     def reset(self):
-        pass
+        self.dv_block_ss = None
 
     def decode(self):
-        pass
+        self.wait({0: 'h', 1: 'f'})
+        self.dv_block_ss = self.samplenum
+
+        self.wait({0: 'h', 1: 'r'})
+        self.put(self.dv_block_ss, self.samplenum, self.out_ann, [0, ['Data valid', 'DV']])
