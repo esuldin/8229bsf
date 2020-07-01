@@ -1,6 +1,10 @@
 import sigrokdecode as srd
 
 
+class SamplerateError(Exception):
+    pass
+
+
 class Decoder(srd.Decoder):
     api_version = 3
     id = '8229bsf'
@@ -31,9 +35,16 @@ class Decoder(srd.Decoder):
     def __init__(self):
         self.key_num = None
         self.out_ann = None
+
+        self.timeout_samples_num = None
+
         self.dv_block_ss = None
         self.tw_block_ss = None
         self.bt_block_ss = None
+
+    def metadata(self, key, value):
+        if key == srd.SRD_CONF_SAMPLERATE:
+            self.timeout_samples_num = int(2 * (value / 1000.0))
 
     def start(self):
         self.out_ann = self.register(srd.OUTPUT_ANN)
@@ -45,6 +56,9 @@ class Decoder(srd.Decoder):
         self.bt_block_ss = None
 
     def decode(self):
+        if not self.timeout_samples_num:
+            raise SamplerateError('Cannot decode without samplerate.')
+
         self.wait({0: 'h', 1: 'f'})
         self.dv_block_ss = self.samplenum
 
@@ -60,7 +74,10 @@ class Decoder(srd.Decoder):
             (scl, sdo) = self.wait({0: 'r'})
             sdo = 0 if sdo else 1
 
-            self.wait({0: 'f'})
+            self.wait([{0: 'f'}, {'skip': self.timeout_samples_num}])
             self.put(self.bt_block_ss, self.samplenum, self.out_ann, [2, ['Bit: %d' % sdo, '%d' % sdo]])
+
+            if (self.matched & 0b10) and i != (self.key_num - 1):
+                break
 
             self.bt_block_ss = self.samplenum
