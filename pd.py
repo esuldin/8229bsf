@@ -13,6 +13,10 @@ class Annotation:
     (DV, TW, BIT, KEY) = range(4)
 
 
+class Pin:
+    (SCL, SDO) = range(2)
+
+
 class Decoder(srd.Decoder):
     api_version = 3
     id = '8229bsf'
@@ -93,21 +97,21 @@ class Decoder(srd.Decoder):
             raise SignalPolarityError('Polarity of signal is not set')
 
         while True:
-            self.wait({0: self.passive_signal, 1: self.front_edge})
+            self.wait({Pin.SCL: self.passive_signal, Pin.SDO: self.front_edge})
             self.dv_block_ss = self.samplenum
 
-            self.wait({0: self.passive_signal, 1: self.back_edge})
+            self.wait({Pin.SCL: self.passive_signal, Pin.SDO: self.back_edge})
             self.put(self.dv_block_ss, self.samplenum, self.out_ann, [Annotation.DV, ['Data valid', 'DV']])
             self.tw_block_ss = self.samplenum
 
-            self.wait([{0: self.front_edge, 1: self.passive_signal}, {0: self.front_edge, 1: self.front_edge}])
+            self.wait([{Pin.SCL: self.front_edge, Pin.SDO: self.passive_signal}, {Pin.SCL: self.front_edge, Pin.SDO: self.front_edge}])
             self.put(self.tw_block_ss, self.samplenum, self.out_ann, [Annotation.TW, ['Tw', 'Tw']])
             self.bt_block_ss = self.samplenum
 
             keys_pressed = list()
 
             for i in range(self.key_num):
-                (scl, sdo) = self.wait({0: self.back_edge})
+                (scl, sdo) = self.wait({Pin.SCL: self.back_edge})
 
                 if (sdo == 1 and self.active_signal == 'h') or (sdo == 0 and self.active_signal == 'l'):
                     keys_pressed.append(str(i + 1))
@@ -115,7 +119,7 @@ class Decoder(srd.Decoder):
                 else:
                     sdo = 0
 
-                self.wait([{0: 'f'}, {'skip': self.timeout_samples_num}])
+                self.wait([{Pin.SCL: 'f'}, {'skip': self.timeout_samples_num}])
                 self.put(self.bt_block_ss, self.samplenum, self.out_ann, [Annotation.BIT, ['Bit: %d' % sdo, '%d' % sdo]])
 
                 if (self.matched & 0b10) and i != (self.key_num - 1):
