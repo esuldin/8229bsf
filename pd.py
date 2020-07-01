@@ -61,35 +61,36 @@ class Decoder(srd.Decoder):
         if not self.timeout_samples_num:
             raise SamplerateError('Cannot decode without samplerate.')
 
-        self.wait({0: 'h', 1: 'f'})
-        self.dv_block_ss = self.samplenum
+        while True:
+            self.wait({0: 'h', 1: 'f'})
+            self.dv_block_ss = self.samplenum
 
-        self.wait({0: 'h', 1: 'r'})
-        self.put(self.dv_block_ss, self.samplenum, self.out_ann, [0, ['Data valid', 'DV']])
-        self.tw_block_ss = self.samplenum
+            self.wait({0: 'h', 1: 'r'})
+            self.put(self.dv_block_ss, self.samplenum, self.out_ann, [0, ['Data valid', 'DV']])
+            self.tw_block_ss = self.samplenum
 
-        self.wait([{0: 'f', 1: 'h'}, {0: 'f', 1: 'f'}])
-        self.put(self.tw_block_ss, self.samplenum, self.out_ann, [1, ['Tw', 'Tw']])
-        self.bt_block_ss = self.samplenum
-
-        keys_pressed = list()
-
-        for i in range(self.key_num):
-            (scl, sdo) = self.wait({0: 'r'})
-            sdo = 0 if sdo else 1
-
-            if sdo:
-                keys_pressed.append(str(i + 1))
-
-            self.wait([{0: 'f'}, {'skip': self.timeout_samples_num}])
-            self.put(self.bt_block_ss, self.samplenum, self.out_ann, [2, ['Bit: %d' % sdo, '%d' % sdo]])
-
-            if (self.matched & 0b10) and i != (self.key_num - 1):
-                break
-
+            self.wait([{0: 'f', 1: 'h'}, {0: 'f', 1: 'f'}])
+            self.put(self.tw_block_ss, self.samplenum, self.out_ann, [1, ['Tw', 'Tw']])
             self.bt_block_ss = self.samplenum
-        else:
-            key_msg = 'Key: %s' % (','.join(keys_pressed)) if keys_pressed else 'Key unpressed'
-            key_msg_short = 'K: %s' % (','.join(keys_pressed)) if keys_pressed else 'KU'
 
-            self.put(self.dv_block_ss, self.samplenum, self.out_ann, [3, [key_msg, key_msg_short]])
+            keys_pressed = list()
+
+            for i in range(self.key_num):
+                (scl, sdo) = self.wait({0: 'r'})
+                sdo = 0 if sdo else 1
+
+                if sdo:
+                    keys_pressed.append(str(i + 1))
+
+                self.wait([{0: 'f'}, {'skip': self.timeout_samples_num}])
+                self.put(self.bt_block_ss, self.samplenum, self.out_ann, [2, ['Bit: %d' % sdo, '%d' % sdo]])
+
+                if (self.matched & 0b10) and i != (self.key_num - 1):
+                    break
+
+                self.bt_block_ss = self.samplenum
+            else:
+                key_msg = 'Key: %s' % (','.join(keys_pressed)) if keys_pressed else 'Key unpressed'
+                key_msg_short = 'K: %s' % (','.join(keys_pressed)) if keys_pressed else 'KU'
+
+                self.put(self.dv_block_ss, self.samplenum, self.out_ann, [3, [key_msg, key_msg_short]])
