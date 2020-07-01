@@ -27,9 +27,11 @@ class Decoder(srd.Decoder):
         ('dv', 'Data valid'),
         ('tw', 'Tw'),
         ('bit', 'Bit'),
+        ('key', 'Key press status'),
     )
     annotation_rows = (
-        ('fields', 'Fields', (0, 1, 2,)),
+        ('fields', 'Fields', (0, 1, 2)),
+        ('keymsg', 'Key message', (3,)),
     )
 
     def __init__(self):
@@ -70,9 +72,14 @@ class Decoder(srd.Decoder):
         self.put(self.tw_block_ss, self.samplenum, self.out_ann, [1, ['Tw', 'Tw']])
         self.bt_block_ss = self.samplenum
 
+        keys_pressed = list()
+
         for i in range(self.key_num):
             (scl, sdo) = self.wait({0: 'r'})
             sdo = 0 if sdo else 1
+
+            if sdo:
+                keys_pressed.append(str(i + 1))
 
             self.wait([{0: 'f'}, {'skip': self.timeout_samples_num}])
             self.put(self.bt_block_ss, self.samplenum, self.out_ann, [2, ['Bit: %d' % sdo, '%d' % sdo]])
@@ -81,3 +88,8 @@ class Decoder(srd.Decoder):
                 break
 
             self.bt_block_ss = self.samplenum
+        else:
+            key_msg = 'Key: %s' % (','.join(keys_pressed)) if keys_pressed else 'Key unpressed'
+            key_msg_short = 'K: %s' % (','.join(keys_pressed)) if keys_pressed else 'KU'
+
+            self.put(self.dv_block_ss, self.samplenum, self.out_ann, [3, [key_msg, key_msg_short]])
